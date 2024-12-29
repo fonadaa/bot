@@ -394,8 +394,9 @@ function sendAudioToWebhook(blob) {
                 .then(response => response.blob())
                 .then(audioBlob => {
                     replaceAudio(URL.createObjectURL(audioBlob));
-
-                    audio.play();
+                    setTimeout(() => {
+                        audio.play();
+                    }, 500);
                 })
                 .catch(error => {
                     console.error('Error sending audio:', error);

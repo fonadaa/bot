@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Chatbot Widget</title>
+    <link rel="stylesheet" href="main.css">
+</head>
+<body>
+    <div class="widget-container">
+        <h1>Voice Chatbot</h1>
+       
+        <div class="mic-container">
+            <div id="micButton" class="mic-icon" onclick="handleMicClick()">
+                <div class="mic-visual">
+                    🎙️
+                </div>
+            </div>
+        </div>
+        <p id="status">Give it a try!</p>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/recordrtc@5.6.1/RecordRTC.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>

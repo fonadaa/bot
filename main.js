@@ -50,19 +50,19 @@ const drBatraClinics = [
 const geoapifyKey = "80c4323e959c436eb333cdcfb0ea8aa3";
 
 function replaceAudio(src) {
-    var newAudio = document.createElement('audio');
-    newAudio.controls = true;
-    newAudio.autoplay = false; // Set autoplay to false for Safari
+    // var newAudio = document.createElement('audio');
+    // newAudio.controls = true;
+    // newAudio.autoplay = false; // Set autoplay to false for Safari
 
-    if (src) {
-        newAudio.src = src;
-    }
+    // if (src) {
+    //     newAudio.src = src;
+    // }
 
-    var parentNode = audio.parentNode;
-    parentNode.innerHTML = '';
-    parentNode.appendChild(newAudio);
+    // var parentNode = audio.parentNode;
+    // parentNode.innerHTML = '';
+    // parentNode.appendChild(newAudio);
 
-    audio = newAudio;
+    audio.src = src;
 
     // Attach a user interaction to play the audio
     audio.addEventListener('canplay', () => {

@@ -52,7 +52,7 @@ const geoapifyKey = "80c4323e959c436eb333cdcfb0ea8aa3";
 function replaceAudio(src) {
     var newAudio = document.createElement('audio');
     newAudio.controls = true;
-    newAudio.autoplay = true;
+    newAudio.autoplay = false; // Set autoplay to false for Safari
 
     if (src) {
         newAudio.src = src;
@@ -63,7 +63,22 @@ function replaceAudio(src) {
     parentNode.appendChild(newAudio);
 
     audio = newAudio;
+
+    // Attach a user interaction to play the audio
+    audio.addEventListener('canplay', () => {
+        setTimeout(() => {
+            audio.play().catch(err => {
+                console.error("Playback error:", err);
+            });
+        }, 500);
+    });
 }
+
+// Trigger playback after user interaction
+document.getElementById('playButton').addEventListener('click', () => {
+    replaceAudio(URL.createObjectURL(audioBlob));
+});
+
 // Utility function: Calculate distance between two coordinates
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const toRad = (value) => (value * Math.PI) / 180;

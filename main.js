@@ -16,8 +16,7 @@ recognition.maxAlternatives = 1;
 // DOM elements
 const statusElement = document.getElementById("status");
 const micButton = document.getElementById("micButton");
-// custom
-audio = document.querySelector('audio');
+
 // RecordRTC setup for capturing audio
 let recorder;
 let isRecording = false;
@@ -49,7 +48,8 @@ const drBatraClinics = [
 // Geoapify API Key
 const geoapifyKey = "80c4323e959c436eb333cdcfb0ea8aa3";
 
-const audio = document.getElementById('audioPlayer');
+    // custom
+const audio = document.querySelector('audio');
 const playButton = document.getElementById('playButton');
 
 function replaceAudio(src) {

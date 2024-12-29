@@ -49,23 +49,16 @@ const drBatraClinics = [
 // Geoapify API Key
 const geoapifyKey = "80c4323e959c436eb333cdcfb0ea8aa3";
 
+const audio = document.getElementById('audioPlayer');
+const playButton = document.getElementById('playButton');
+
 function replaceAudio(src) {
-    // var newAudio = document.createElement('audio');
-    // newAudio.controls = true;
-    // newAudio.autoplay = false; // Set autoplay to false for Safari
-
-    // if (src) {
-    //     newAudio.src = src;
-    // }
-
-    // var parentNode = audio.parentNode;
-    // parentNode.innerHTML = '';
-    // parentNode.appendChild(newAudio);
-
+    // Update the audio source
     audio.src = src;
 
-    // Attach a user interaction to play the audio
+    // Wait for the audio to load
     audio.addEventListener('canplay', () => {
+        console.log("Audio is ready to play");
         setTimeout(() => {
             audio.play().catch(err => {
                 console.error("Playback error:", err);
@@ -73,6 +66,11 @@ function replaceAudio(src) {
         }, 500);
     });
 }
+
+// Trigger playback on button click
+playButton.addEventListener('click', () => {
+    replaceAudio(URL.createObjectURL(audioBlob)); // Pass your Blob URL here
+});
 
 // Trigger playback after user interaction
 document.getElementById('playButton').addEventListener('click', () => {
@@ -408,6 +406,7 @@ function sendAudioToWebhook(blob) {
             })
                 .then(response => response.blob())
                 .then(audioBlob => {
+                    // playResponseAudio(audioBlob);
                     replaceAudio(URL.createObjectURL(audioBlob));
                     setTimeout(() => {
                         audio.play();

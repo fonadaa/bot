@@ -170,6 +170,7 @@ function startRecording() {
                 recognition.start(); // Start recognition only if not running
                 isRecognitionRunning = true;
             }
+            micButton.classList.add("listening"); // Add listening class
         }).catch(error => {
             console.error('Error accessing media devices:', error);
             statusElement.textContent = "Error accessing the microphone.";
@@ -191,6 +192,7 @@ function stopRecording() {
             recorder = null;
             isRecording = false;
         });
+        micButton.classList.remove("listening"); // Remove listening class
     }
 }
 

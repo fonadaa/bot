@@ -49,7 +49,7 @@ const drBatraClinics = [
 const geoapifyKey = "80c4323e959c436eb333cdcfb0ea8aa3";
 
     // custom
-const audio = document.querySelector('audio');
+const audio = document.getElementById('audioPlayer');
 const playButton = document.getElementById('playButton');
 
 function replaceAudio(src) {

@@ -77,72 +77,215 @@ function findNearestClinic(lat, lon) {
     return nearestClinic;
 }
 
-// Function to get user location and reverse geocode it
-function getUserLocation() {
+// Initialize variables for location tracking
+let lastKnownLat = null;
+let lastKnownLon = null;
+let locationInitialized = false;
+
+// Function to handle initial location setup
+async function initializeLocation() {
+    if (locationInitialized) return;
+
     return new Promise((resolve, reject) => {
+        const geoOptions = {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        };
+
+        // Show loading state
+        statusElement.textContent = "Getting location...";
+
+        // iOS and Safari specific timeout handling
+        const locationTimeout = setTimeout(() => {
+            reject("Location request timed out. Please ensure location permissions are enabled.");
+        }, 10000);
+
         navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                const geoapifyUrl = `https://api.geoapify.com/v1/geocode/reverse?lat=${latitude}&lon=${longitude}&apiKey=${geoapifyKey}`;
+            async (position) => {
+                clearTimeout(locationTimeout);
+                try {
+                    const { latitude, longitude } = position.coords;
+                    lastKnownLat = latitude;
+                    lastKnownLon = longitude;
 
-                fetch(geoapifyUrl)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.features && data.features.length > 0) {
-                            const address = data.features[0].properties.formatted;
-                            userAddress = address; // Store the user's address
-                            console.log("User Address:", userAddress);
+                    const geoapifyUrl = `https://api.geoapify.com/v1/geocode/reverse?lat=${latitude}&lon=${longitude}&apiKey=${geoapifyKey}`;
+                    const response = await fetch(geoapifyUrl);
+                    const data = await response.json();
 
-                            const nearestClinic = findNearestClinic(latitude, longitude);
-                            console.log("Nearest Clinic:", nearestClinic);
-
-                            resolve({ userAddress, nearestClinic });
-                        } else {
-                            reject("Unable to retrieve address.");
-                        }
-                    })
-                    .catch(error => {
-                        console.error("Error fetching address:", error);
-                        reject(error);
-                    });
+                    if (data.features && data.features.length > 0) {
+                        userAddress = data.features[0].properties.formatted;
+                        locationInitialized = true;
+                        statusElement.textContent = "Give it a try!";
+                        resolve();
+                    } else {
+                        reject("Unable to retrieve address.");
+                    }
+                } catch (error) {
+                    console.error("Error fetching address:", error);
+                    reject(error);
+                }
             },
             (error) => {
+                clearTimeout(locationTimeout);
                 console.error("Geolocation error:", error);
-                reject("Geolocation access denied.");
-            }
+                reject("Please enable location access to continue.");
+            },
+            geoOptions
         );
     });
 }
 
-// Handle the speech recognition result
+// Enhanced speech recognition handling
+let lastRecognitionRestartTime = 0;
+const MINIMUM_RESTART_INTERVAL = 1000; // Minimum time between restarts
+
+// Add a flag to track if actual speech was detected
+let speechDetected = false;
+
+// Add a variable to track if microphone permission is granted
+let microphonePermissionGranted = false;
+let activeStream = null; // Store the active audio stream
+
+// Add recognition state tracking
+let recognitionAttempts = 0;
+const MAX_RECOGNITION_ATTEMPTS = 3;
+
+// Update startRecording function
+function startRecording() {
+    if (!isRecording && !isPlaybackActive) {
+        const now = Date.now();
+        if (now - lastRecognitionRestartTime < MINIMUM_RESTART_INTERVAL) {
+            return;
+        }
+        lastRecognitionRestartTime = now;
+
+        // Reset states
+        isRecording = false;
+        isRecognitionRunning = false;
+        speechDetected = false;
+
+        // If we already have microphone permission and an active stream, use it
+        if (microphonePermissionGranted && activeStream) {
+            initializeRecording(activeStream);
+        } else {
+            // Request microphone permission
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    microphonePermissionGranted = true;
+                    activeStream = stream;
+                    initializeRecording(stream);
+                })
+                .catch(error => {
+                    console.error('Error accessing media devices:', error);
+                    statusElement.textContent = "Error accessing the microphone. Please ensure microphone permissions are enabled.";
+                    isRecording = false;
+                    isRecognitionRunning = false;
+                    microphonePermissionGranted = false;
+                });
+        }
+    }
+}
+
+// Separate function to initialize recording with a stream
+function initializeRecording(stream) {
+    if (isRecognitionRunning) {
+        try {
+            recognition.abort();
+        } catch (e) {
+            console.log('Recognition abort error:', e);
+        }
+        isRecognitionRunning = false;
+    }
+    
+    recorder = new RecordRTC(stream, {
+        type: 'audio',
+        mimeType: getMimeType(),
+        recorderType: RecordRTC.StereoAudioRecorder,
+        timeSlice: 1000,
+        ondataavailable: () => {
+            resetSilenceDetection();
+        }
+    });
+    
+    recorder.startRecording();
+    isRecording = true;
+    statusElement.textContent = "Listening...";
+    updateUIState('listening');
+
+    setTimeout(() => {
+        try {
+            recognition.start();
+            isRecognitionRunning = true;
+            startSilenceDetection();
+        } catch (e) {
+            console.log('Recognition start error:', e);
+            resetRecording();
+        }
+    }, 100);
+}
+
+// Silence detection
+let silenceTimer = null;
+const SILENCE_THRESHOLD = 3000; // 3 seconds of silence
+
+function startSilenceDetection() {
+    resetSilenceDetection();
+    silenceTimer = setTimeout(() => {
+        if (isRecording) {
+            stopRecording(); // This will now handle silence gracefully
+        }
+    }, SILENCE_THRESHOLD);
+}
+
+function resetSilenceDetection() {
+    if (silenceTimer) {
+        clearTimeout(silenceTimer);
+    }
+    if (isRecording) {
+        silenceTimer = setTimeout(() => {
+            if (isRecording) {
+                stopRecording();
+            }
+        }, SILENCE_THRESHOLD);
+    }
+}
+
+// Update recognition handlers
 recognition.onresult = (event) => {
     let transcript = '';
     for (let i = event.resultIndex; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
-    }
-    statusElement.textContent = `You said: ${transcript}`;
-
-    // Clear the previous silence timeout and reset it
-    clearTimeout(silenceTimeout);
-
-    // Set a new timeout to stop recording after 2 seconds of silence
-    silenceTimeout = setTimeout(() => {
-        if (isRecording) {
-            stopRecording(); // Stop recording after silence
+        if (event.results[i][0].transcript.trim().length > 0) {
+            transcript += event.results[i][0].transcript;
+            speechDetected = true; // Set flag when actual speech is detected
         }
-    }, 2000);
+    }
+    if (transcript) {
+        statusElement.textContent = `You said: ${transcript}`;
+        resetSilenceDetection();
+    }
 };
 
-// Handle speech recognition errors
-recognition.onerror = (event) => {
-    console.error("Speech recognition error:", event.error);
-};
-
-// Handle speech recognition end
 recognition.onend = () => {
-    isRecognitionRunning = false; // Update flag when recognition stops
-    if (!isPlaybackActive) {
-        console.log("Ready to listen again.");
+    isRecognitionRunning = false;
+    if (!isPlaybackActive && !isProcessing) {
+        // Reset attempts on successful completion
+        recognitionAttempts = 0;
+        setTimeout(() => {
+            if (!isRecording && !isPlaybackActive && !isProcessing) {
+                startRecording();
+            }
+        }, 300);
+    }
+};
+
+recognition.onerror = (event) => {
+    console.log('Speech recognition error:', event.error);
+    isRecognitionRunning = false;
+    
+    if (event.error === 'no-speech' && recognitionAttempts < MAX_RECOGNITION_ATTEMPTS) {
+        recognitionAttempts++;
+        restartRecognition();
     }
 };
 
@@ -184,46 +327,25 @@ function updateUIState(state) {
     }
 }
 
-// Start recording when the user speaks
-function startRecording() {
-    if (!isRecording && !isPlaybackActive) {
-        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-            recorder = new RecordRTC(stream, {
-                type: 'audio',
-                mimeType: getMimeType(),
-                recorderType: RecordRTC.StereoAudioRecorder
-            });
-            recorder.startRecording();
-            isRecording = true;
-            statusElement.textContent = "Listening...";
-            updateUIState('listening');
-
-            if (!isRecognitionRunning) {
-                recognition.start();
-                isRecognitionRunning = true;
-            }
-        }).catch(error => {
-            console.error('Error accessing media devices:', error);
-            statusElement.textContent = "Error accessing the microphone.";
-        });
-    }
-}
-
 // Stop recording and handle the audio blob
 function stopRecording() {
     if (recorder && isRecording) {
+        if (!speechDetected) {
+            resetRecording();
+            return;
+        }
+
         recorder.stopRecording(() => {
             const blob = recorder.getBlob();
-
-            // Send the blob to the webhook
             sendAudioToWebhook(blob);
-
-            // Reset the recorder for the next recording session
+            
+            // Clean up
             recorder.destroy();
             recorder = null;
             isRecording = false;
+            speechDetected = false;
+            recognitionAttempts = 0;
         });
-        micButton.classList.remove("listening"); // Remove listening class
     }
 }
 
@@ -270,37 +392,131 @@ function playResponseAudio(audioBlob) {
     const audio = new Audio(audioUrl);
     statusElement.textContent = "Playing Response...";
     updateUIState('speaking');
-
     isPlaybackActive = true;
+    speechDetected = false;
+    recognitionAttempts = 0;
 
-    audio.play().then(() => {
-        audio.onended = () => {
-            statusElement.textContent = "Ready";
-            updateUIState('listening');
+    audio.play()
+        .then(() => {
+            audio.onended = () => {
+                statusElement.textContent = "Ready";
+                updateUIState('listening');
+                isPlaybackActive = false;
+                URL.revokeObjectURL(audioUrl);
+                resetRecording();
+            };
+        })
+        .catch(error => {
+            console.error('Error playing audio:', error);
+            statusElement.textContent = "Error playing audio.";
             isPlaybackActive = false;
+            updateUIState('listening');
+            URL.revokeObjectURL(audioUrl);
+            resetRecording();
+        });
+}
 
-            if (!isRecognitionRunning) {
-                startRecording();
-            }
-        };
-    }).catch(error => {
-        console.error('Error playing audio:', error);
-        statusElement.textContent = "Error playing audio.";
-        isPlaybackActive = false;
-        updateUIState('listening');
+// Update handleMicClick to handle permissions sequentially
+async function handleMicClick() {
+    if (isProcessing || isRecording) return;
+
+    try {
+        // First, ensure we have location
+        if (!locationInitialized) {
+            await initializeLocation();
+        }
+
+        // Then handle microphone
+        if (!isRecording && !isPlaybackActive) {
+            startRecording();
+        }
+    } catch (error) {
+        console.error("Error:", error);
+        statusElement.textContent = error;
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        await initializeLocation();
+    } catch (error) {
+        console.error("Initial location error:", error);
+        statusElement.textContent = "Location access needed";
+    }
+});
+
+// Update getUserLocation to use the initialized location
+function getUserLocation() {
+    return new Promise((resolve, reject) => {
+        if (!locationInitialized) {
+            reject("Location not initialized. Please enable location access.");
+            return;
+        }
+
+        const nearestClinic = findNearestClinic(lastKnownLat, lastKnownLon);
+        resolve({ userAddress, nearestClinic });
     });
 }
 
-// Start the process on mic click
-async function handleMicClick() {
-    if (!isProcessing && !isRecording) {
+// Clean up function for when leaving the page
+window.addEventListener('beforeunload', () => {
+    if (activeStream) {
+        activeStream.getTracks().forEach(track => track.stop());
+    }
+    if (recorder) {
+        recorder.destroy();
+    }
+});
+
+// Function to safely restart recognition
+function restartRecognition() {
+    if (recognition) {
         try {
-            // Request geolocation before starting
-            statusElement.textContent = "Getting location...";
-            await getUserLocation();
-            startRecording(); // Start recording after getting location
-        } catch (error) {
-            statusElement.textContent = error; // Show geolocation error
+            recognition.abort();
+        } catch (e) {
+            console.log('Recognition abort error:', e);
+        }
+        
+        isRecognitionRunning = false;
+        
+        setTimeout(() => {
+            try {
+                recognition.start();
+                isRecognitionRunning = true;
+            } catch (e) {
+                console.log('Recognition restart error:', e);
+                // If restart fails, try complete reset
+                resetRecording();
+            }
+        }, 100);
+    }
+}
+
+// Function to completely reset recording state
+function resetRecording() {
+    if (recorder) {
+        recorder.destroy();
+        recorder = null;
+    }
+    
+    if (recognition) {
+        try {
+            recognition.abort();
+        } catch (e) {
+            console.log('Recognition abort error:', e);
         }
     }
+    
+    isRecording = false;
+    isRecognitionRunning = false;
+    speechDetected = false;
+    recognitionAttempts = 0;
+    
+    // Restart with a delay
+    setTimeout(() => {
+        if (!isPlaybackActive && !isProcessing) {
+            startRecording();
+        }
+    }, 500);
 }

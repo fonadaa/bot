@@ -16,29 +16,33 @@ body {
     background: #2d2d2d;
     border-radius: 15px;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
-    padding: 20px;
+    padding: 30px;
     text-align: center;
-    width: 300px;
+    width: 480px;
 }
 
 h1 {
     font-size: 24px;
     color: #ffffff;
-    margin-bottom: 10px;
+    margin-bottom: 30px;
+    font-weight: 500;
 }
 
 #status {
     font-size: 16px;
     color: #e0e0e0;
-    margin-top: 20px;
+    margin-top: 30px;
+    min-height: 24px;
+    font-weight: 400;
 }
 
-/* Microphone Container Fix */
+/* Microphone Container */
 .mic-container {
     display: flex;
     justify-content: center;
     align-items: center;
-    margin: 20px 0; /* Adds even spacing between elements */
+    margin: 40px 0;
+    min-height: 120px;
 }
 
 /* Microphone Button Styles */
@@ -54,7 +58,7 @@ h1 {
     transition: all 0.3s ease;
     cursor: pointer;
     position: relative;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .mic-icon:hover {
@@ -70,17 +74,35 @@ h1 {
     width: 40px;
     height: 40px;
     position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2;
 }
 
-/* SVG Microphone styles */
-.mic-visual svg {
+/* SVG styles */
+.mic-svg, .speaker-svg {
     width: 100%;
     height: 100%;
     fill: #ffffff;
+    transition: all 0.3s ease;
+}
+
+.processing-gif {
+    width: 80px;
+    height: 80px;
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    z-index: 3;
 }
 
 /* Listening Animation */
-.mic-icon.listening::before {
+.mic-icon.listening::before,
+.mic-icon.speaking::before {
     content: '';
     position: absolute;
     width: 100%;
@@ -90,7 +112,8 @@ h1 {
     animation: ripple 1.5s infinite;
 }
 
-.mic-icon.listening::after {
+.mic-icon.listening::after,
+.mic-icon.speaking::after {
     content: '';
     position: absolute;
     width: 100%;
@@ -102,12 +125,11 @@ h1 {
 
 /* Disabled State */
 .mic-icon.disabled {
-    background-color: #424242;
-    opacity: 0.5;
-    cursor: not-allowed;
+    background: none;
+    box-shadow: none;
 }
 
-/* Ripple Animation */
+/* Animations */
 @keyframes ripple {
     0% {
         transform: scale(1);
@@ -119,33 +141,106 @@ h1 {
     }
 }
 
-/* Wave Animation for active listening */
-.listening .mic-visual svg {
-    animation: pulse 1s infinite ease-in-out;
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
 }
 
-@keyframes pulse {
+@keyframes speakerWave {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+.listening .mic-svg {
+    animation: pulseAndRotate 1.5s infinite ease-in-out;
+}
+
+.speaking .speaker-svg {
+    animation: speakerPulse 1.5s infinite ease-in-out;
+}
+
+/* Enhanced Microphone and Speaker Animations */
+.mic-svg {
+    width: 100%;
+    height: 100%;
+    fill: #ffffff;
+    transition: all 0.3s ease;
+}
+
+.speaker-svg {
+    width: 100%;
+    height: 100%;
+    fill: #ffffff;
+    transition: all 0.3s ease;
+}
+
+/* Listening State Animations */
+.listening .mic-svg {
+    animation: pulseAndRotate 1.5s infinite ease-in-out;
+}
+
+/* Speaking State Animations */
+.speaking .speaker-svg {
+    animation: speakerPulse 1.5s infinite ease-in-out;
+}
+
+/* Animation Keyframes */
+@keyframes pulseAndRotate {
     0% {
-        transform: scale(1);
+        transform: scale(1) rotate(0deg);
     }
     50% {
-        transform: scale(1.1);
+        transform: scale(1.2) rotate(3deg);
+    }
+    100% {
+        transform: scale(1) rotate(0deg);
+    }
+}
+
+@keyframes speakerPulse {
+    0% {
+        transform: scale(1);
+        fill: #ffffff;
+    }
+    50% {
+        transform: scale(1.2);
+        fill: #4CAF50;
     }
     100% {
         transform: scale(1);
+        fill: #ffffff;
     }
 }
 
-/* Add a smooth fade-in animation for the status */
-#status {
-    animation: fadeIn 0.5s ease;
+/* Ripple effect for listening state */
+.mic-icon.listening::before,
+.mic-icon.listening::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(45deg, rgba(255, 255, 255, 0.2), rgba(76, 175, 80, 0.2));
+    border-radius: 50%;
+    z-index: 0;
 }
 
-@keyframes fadeIn {
-    from {
+.mic-icon.listening::before {
+    animation: rippleOut 2s infinite ease-out;
+}
+
+.mic-icon.listening::after {
+    animation: rippleOut 2s infinite ease-out 0.5s;
+}
+
+@keyframes rippleOut {
+    0% {
+        transform: scale(1);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(2.5);
         opacity: 0;
-    }
-    to {
-        opacity: 1;
     }
 }

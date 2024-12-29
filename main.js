@@ -152,25 +152,56 @@ function getMimeType() {
     return isSafari ? 'audio/mp4' : 'audio/webm';
 }
 
+// Add these functions to update UI states
+function updateUIState(state) {
+    const micVisual = document.querySelector('.mic-visual');
+    const micSvg = document.querySelector('.mic-svg');
+    const speakerSvg = document.querySelector('.speaker-svg');
+    const processingGif = document.querySelector('.processing-gif');
+    const micButton = document.getElementById('micButton');
+
+    // Reset all states first
+    micButton.classList.remove('listening', 'speaking', 'disabled');
+    micSvg.style.display = 'none';
+    speakerSvg.style.display = 'none';
+    processingGif.style.display = 'none';
+
+    switch(state) {
+        case 'listening':
+            micSvg.style.display = 'block';
+            micButton.classList.add('listening');
+            break;
+        case 'processing':
+            processingGif.style.display = 'block';
+            micButton.classList.add('disabled');
+            break;
+        case 'speaking':
+            speakerSvg.style.display = 'block';
+            micButton.classList.add('speaking');
+            break;
+        default:
+            micSvg.style.display = 'block';
+    }
+}
+
 // Start recording when the user speaks
 function startRecording() {
     if (!isRecording && !isPlaybackActive) {
         navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
             recorder = new RecordRTC(stream, {
                 type: 'audio',
-                mimeType: getMimeType(),  // Use the mime type based on the browser
+                mimeType: getMimeType(),
                 recorderType: RecordRTC.StereoAudioRecorder
             });
             recorder.startRecording();
             isRecording = true;
-            statusElement.textContent = "Listening..."; // Change status to listening
-            micButton.classList.add("disabled");
+            statusElement.textContent = "Listening...";
+            updateUIState('listening');
 
             if (!isRecognitionRunning) {
-                recognition.start(); // Start recognition only if not running
+                recognition.start();
                 isRecognitionRunning = true;
             }
-            micButton.classList.add("listening"); // Add listening class
         }).catch(error => {
             console.error('Error accessing media devices:', error);
             statusElement.textContent = "Error accessing the microphone.";
@@ -197,10 +228,11 @@ function stopRecording() {
 }
 
 function sendAudioToWebhook(blob) {
-    if (isProcessing) return; // Prevent multiple API calls
+    if (isProcessing) return;
     isProcessing = true;
 
-    statusElement.textContent = "Processing..."; // Set status to processing
+    statusElement.textContent = "Processing...";
+    updateUIState('processing');
 
     getUserLocation()
         .then(({ userAddress, nearestClinic }) => {
@@ -236,27 +268,26 @@ function sendAudioToWebhook(blob) {
 function playResponseAudio(audioBlob) {
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
-    statusElement.textContent = "Playing Response..."; // Change status to Playing Response
-    micButton.classList.add("disabled"); // Disable mic button while playing response
+    statusElement.textContent = "Playing Response...";
+    updateUIState('speaking');
 
-    isPlaybackActive = true; // Set playback flag to ignore response audio
+    isPlaybackActive = true;
 
     audio.play().then(() => {
         audio.onended = () => {
-            statusElement.textContent = "Ready"; // Update status after playing response
-            micButton.classList.remove("disabled");
+            statusElement.textContent = "Ready";
+            updateUIState('listening');
+            isPlaybackActive = false;
 
-            isPlaybackActive = false; // Clear playback flag
-
-            // Reinitialize listening state
             if (!isRecognitionRunning) {
-                startRecording(); // Restart listening only after playback ends
+                startRecording();
             }
         };
     }).catch(error => {
         console.error('Error playing audio:', error);
         statusElement.textContent = "Error playing audio.";
-        isPlaybackActive = false; // Clear playback flag on error
+        isPlaybackActive = false;
+        updateUIState('listening');
     });
 }
 

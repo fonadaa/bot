@@ -101,6 +101,14 @@ async function initializeLocation() {
             reject("Location request timed out. Please ensure location permissions are enabled.");
         }, 10000);
 
+        // Force location prompt in Safari
+        if (!navigator.geolocation) {
+            clearTimeout(locationTimeout);
+            reject("Your browser does not support geolocation. Please use an updated browser.");
+            return;
+        }
+
+        // Try to get location immediately on page load
         navigator.geolocation.getCurrentPosition(
             async (position) => {
                 clearTimeout(locationTimeout);
@@ -416,7 +424,7 @@ function playResponseAudio(audioBlob) {
         });
 }
 
-// Update handleMicClick to handle permissions sequentially
+// Update handleMicClick to ensure location is initialized first
 async function handleMicClick() {
     if (isProcessing || isRecording) return;
 
@@ -436,13 +444,35 @@ async function handleMicClick() {
     }
 }
 
-// Initialize on page load
+// Initialize on page load - with retry for Safari
 document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        await initializeLocation();
-    } catch (error) {
-        console.error("Initial location error:", error);
-        statusElement.textContent = "Location access needed";
+    // Force immediate location request for Safari
+    if (navigator.geolocation) {
+        // Show initial prompt
+        statusElement.textContent = "Please allow location access...";
+        
+        try {
+            await initializeLocation();
+        } catch (error) {
+            console.error("Initial location error:", error);
+            statusElement.textContent = "Location access needed. Please click 'Allow' when prompted.";
+            
+            // Add a visible prompt for location permission
+            const locationPrompt = document.createElement('button');
+            locationPrompt.textContent = "Enable Location";
+            locationPrompt.style.marginTop = "10px";
+            locationPrompt.onclick = async () => {
+                try {
+                    await initializeLocation();
+                    locationPrompt.remove(); // Remove button after successful location
+                } catch (err) {
+                    statusElement.textContent = "Location access is required. Please enable in your browser settings.";
+                }
+            };
+            statusElement.parentNode.insertBefore(locationPrompt, statusElement.nextSibling);
+        }
+    } else {
+        statusElement.textContent = "Geolocation is not supported by your browser.";
     }
 });
 

@@ -57,25 +57,11 @@ function replaceAudio(src) {
     audio.src = src;
 
     // Wait for the audio to load
-    audio.addEventListener('canplay', () => {
-        console.log("Audio is ready to play");
-        setTimeout(() => {
-            audio.play().catch(err => {
-                console.error("Playback error:", err);
-            });
-        }, 500);
-    });
+    
 }
 
-// Trigger playback on button click
-playButton.addEventListener('click', () => {
-    replaceAudio(URL.createObjectURL(audioBlob)); // Pass your Blob URL here
-});
 
-// Trigger playback after user interaction
-document.getElementById('playButton').addEventListener('click', () => {
-    replaceAudio(URL.createObjectURL(audioBlob));
-});
+
 
 // Utility function: Calculate distance between two coordinates
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -408,9 +394,13 @@ function sendAudioToWebhook(blob) {
                 .then(audioBlob => {
                     // playResponseAudio(audioBlob);
                     replaceAudio(URL.createObjectURL(audioBlob));
-                    setTimeout(() => {
-                        audio.play();
-                    }, 500);
+                    
+                        
+                        // Trigger playback on button click
+                        playButton.addEventListener('click', () => {
+                            audio.play();// Pass your Blob URL here
+                        });
+
                 })
                 .catch(error => {
                     console.error('Error sending audio:', error);

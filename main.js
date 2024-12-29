@@ -16,7 +16,8 @@ recognition.maxAlternatives = 1;
 // DOM elements
 const statusElement = document.getElementById("status");
 const micButton = document.getElementById("micButton");
-
+// custom
+audio = document.querySelector('audio');
 // RecordRTC setup for capturing audio
 let recorder;
 let isRecording = false;
@@ -48,6 +49,21 @@ const drBatraClinics = [
 // Geoapify API Key
 const geoapifyKey = "80c4323e959c436eb333cdcfb0ea8aa3";
 
+function replaceAudio(src) {
+    var newAudio = document.createElement('audio');
+    newAudio.controls = true;
+    newAudio.autoplay = true;
+
+    if (src) {
+        newAudio.src = src;
+    }
+
+    var parentNode = audio.parentNode;
+    parentNode.innerHTML = '';
+    parentNode.appendChild(newAudio);
+
+    audio = newAudio;
+}
 // Utility function: Calculate distance between two coordinates
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const toRad = (value) => (value * Math.PI) / 180;
@@ -55,8 +71,8 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     const dLat = toRad(lat2 - lat1);
     const dLon = toRad(lon2 - lon1);
     const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
 }
@@ -205,7 +221,7 @@ function initializeRecording(stream) {
         }
         isRecognitionRunning = false;
     }
-    
+
     recorder = new RecordRTC(stream, {
         type: 'audio',
         mimeType: getMimeType(),
@@ -215,7 +231,7 @@ function initializeRecording(stream) {
             resetSilenceDetection();
         }
     });
-    
+
     recorder.startRecording();
     isRecording = true;
     statusElement.textContent = "Listening...";
@@ -290,7 +306,7 @@ recognition.onend = () => {
 recognition.onerror = (event) => {
     console.log('Speech recognition error:', event.error);
     isRecognitionRunning = false;
-    
+
     if (event.error === 'no-speech' && recognitionAttempts < MAX_RECOGNITION_ATTEMPTS) {
         recognitionAttempts++;
         restartRecognition();
@@ -317,7 +333,7 @@ function updateUIState(state) {
     speakerSvg.style.display = 'none';
     processingGif.style.display = 'none';
 
-    switch(state) {
+    switch (state) {
         case 'listening':
             micSvg.style.display = 'block';
             micButton.classList.add('listening');
@@ -346,7 +362,7 @@ function stopRecording() {
         recorder.stopRecording(() => {
             const blob = recorder.getBlob();
             sendAudioToWebhook(blob);
-            
+
             // Clean up
             recorder.destroy();
             recorder = null;
@@ -377,7 +393,9 @@ function sendAudioToWebhook(blob) {
             })
                 .then(response => response.blob())
                 .then(audioBlob => {
-                    playResponseAudio(audioBlob);
+                    replaceAudio(URL.createObjectURL(audioBlob));
+
+                    audio.play();
                 })
                 .catch(error => {
                     console.error('Error sending audio:', error);
@@ -450,13 +468,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (navigator.geolocation) {
         // Show initial prompt
         statusElement.textContent = "Please allow location access...";
-        
+
         try {
             await initializeLocation();
         } catch (error) {
             console.error("Initial location error:", error);
             statusElement.textContent = "Location access needed. Please click 'Allow' when prompted.";
-            
+
             // Add a visible prompt for location permission
             const locationPrompt = document.createElement('button');
             locationPrompt.textContent = "Enable Location";
@@ -507,9 +525,9 @@ function restartRecognition() {
         } catch (e) {
             console.log('Recognition abort error:', e);
         }
-        
+
         isRecognitionRunning = false;
-        
+
         setTimeout(() => {
             try {
                 recognition.start();
@@ -529,7 +547,7 @@ function resetRecording() {
         recorder.destroy();
         recorder = null;
     }
-    
+
     if (recognition) {
         try {
             recognition.abort();
@@ -537,12 +555,12 @@ function resetRecording() {
             console.log('Recognition abort error:', e);
         }
     }
-    
+
     isRecording = false;
     isRecognitionRunning = false;
     speechDetected = false;
     recognitionAttempts = 0;
-    
+
     // Restart with a delay
     setTimeout(() => {
         if (!isPlaybackActive && !isProcessing) {

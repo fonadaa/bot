@@ -395,7 +395,7 @@ function sendAudioToWebhook(blob) {
             formData.append('DrBatra_address', nearestClinic.address);
             formData.append('session_id', sessionId); // Add session ID to the request
 
-            fetch('https://fonada.app.n8n.cloud/webhook/2bdfe4c3-d9be-43cc-9f0c-bd14630fc275', {
+            fetch('https://fonada.app.n8n.cloud/webhook-test/2bdfe4c3-d9be-43cc-9f0c-bd14630fc275', {
                 method: 'POST',
                 body: formData
             })

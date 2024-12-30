@@ -174,6 +174,14 @@ let activeStream = null; // Store the active audio stream
 let recognitionAttempts = 0;
 const MAX_RECOGNITION_ATTEMPTS = 3;
 
+// Add at the top with other global variables
+let sessionId = generateSessionId(); // Generate initial session ID
+
+// Add this function to generate session ID
+function generateSessionId() {
+    return 'sid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
 // Update startRecording function
 function startRecording() {
     if (!isRecording && !isPlaybackActive) {
@@ -384,18 +392,17 @@ function sendAudioToWebhook(blob) {
             const formData = new FormData();
             formData.append('data', blob);
             formData.append('User_address', userAddress);
-            formData.append('DrBatra_address', nearestClinic.address); // Include nearest clinic's address
+            formData.append('DrBatra_address', nearestClinic.address);
+            formData.append('session_id', sessionId); // Add session ID to the request
 
-            fetch('https://fonada.app.n8n.cloud/webhook-test/2bdfe4c3-d9be-43cc-9f0c-bd14630fc275', {
+            fetch('https://fonada.app.n8n.cloud/webhook/2bdfe4c3-d9be-43cc-9f0c-bd14630fc275', {
                 method: 'POST',
                 body: formData
             })
                 .then(response => response.blob())
                 .then(audioBlob => {
                     playResponseAudio(audioBlob);
-                    // replaceAudio(URL.createObjectURL(audioBlob));
-                    
-                        
+                    // replaceAudio(URL.createObjectURL(audioBlob));        
                     //     // Trigger playback on button click
                     //     playButton.addEventListener('click', () => {
                     //         audio.play();// Pass your Blob URL here
@@ -469,6 +476,7 @@ async function handleMicClick() {
 
 // Initialize on page load - with retry for Safari
 document.addEventListener('DOMContentLoaded', async () => {
+    refreshSession(); // Generate new session ID when page loads
     // Force immediate location request for Safari
     if (navigator.geolocation) {
         // Show initial prompt
@@ -572,4 +580,9 @@ function resetRecording() {
             startRecording();
         }
     }, 500);
+}
+
+// Add this function to handle session refresh
+function refreshSession() {
+    sessionId = generateSessionId();
 }

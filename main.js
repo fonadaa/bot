@@ -49,16 +49,16 @@ const drBatraClinics = [
 const geoapifyKey = "80c4323e959c436eb333cdcfb0ea8aa3";
 
     // custom
-const audio = document.getElementById('audioPlayer');
-const playButton = document.getElementById('playButton');
+// const audio = document.getElementById('audioPlayer');
+// const playButton = document.getElementById('playButton');
 
-function replaceAudio(src) {
-    // Update the audio source
-    audio.src = src;
+// function replaceAudio(src) {
+//     // Update the audio source
+//     audio.src = src;
 
-    // Wait for the audio to load
+//     // Wait for the audio to load
     
-}
+// }
 
 
 
@@ -392,14 +392,14 @@ function sendAudioToWebhook(blob) {
             })
                 .then(response => response.blob())
                 .then(audioBlob => {
-                    // playResponseAudio(audioBlob);
-                    replaceAudio(URL.createObjectURL(audioBlob));
+                    playResponseAudio(audioBlob);
+                    // replaceAudio(URL.createObjectURL(audioBlob));
                     
                         
-                        // Trigger playback on button click
-                        playButton.addEventListener('click', () => {
-                            audio.play();// Pass your Blob URL here
-                        });
+                    //     // Trigger playback on button click
+                    //     playButton.addEventListener('click', () => {
+                    //         audio.play();// Pass your Blob URL here
+                    //     });
 
                 })
                 .catch(error => {

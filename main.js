@@ -1,17 +1,29 @@
 // Check for browser support for Web Speech API and Geolocation
 if (!('webkitSpeechRecognition' in window)) {
-    alert("Your browser does not support speech recognition. Please use Chrome or Edge.");
+    if ('SpeechRecognition' in window) {
+        // Standard Speech Recognition API (might be available in future Safari versions)
+        window.webkitSpeechRecognition = window.SpeechRecognition;
+    } else {
+        alert("Speech recognition is not supported in this browser. Please use Chrome or Edge.");
+    }
 }
 if (!navigator.geolocation) {
     alert("Your browser does not support geolocation. Please use an updated browser.");
 }
 
 // Set up Speech Recognition
-const recognition = new webkitSpeechRecognition();
-recognition.continuous = false; // Stop listening after each utterance
-recognition.interimResults = true;
-recognition.lang = 'en-US';
-recognition.maxAlternatives = 1;
+let recognition;
+try {
+    if ('webkitSpeechRecognition' in window) {
+        recognition = new webkitSpeechRecognition();
+    } else if ('SpeechRecognition' in window) {
+        recognition = new SpeechRecognition();
+    } else {
+        throw new Error("Speech recognition not supported");
+    }
+} catch (e) {
+    console.error("Speech Recognition initialization failed:", e);
+}
 
 // DOM elements
 const statusElement = document.getElementById("status");
@@ -56,8 +68,17 @@ const geoapifyKey = "80c4323e959c436eb333cdcfb0ea8aa3";
 //     audio.src = src;  
 // }
 
+// Add this near the top of your file
+const DEBUG = true;
 
-
+function debugLog(message, error = null) {
+    if (DEBUG) {
+        console.log(`[Debug] ${message}`);
+        if (error) {
+            console.error(error);
+        }
+    }
+}
 
 // Utility function: Calculate distance between two coordinates
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -105,7 +126,7 @@ async function initializeLocation() {
         };
 
         // Show loading state
-        statusElement.textContent = "Getting location...";
+        statusElement.textContent = "Hold On! Getting your location...";
 
         // iOS and Safari specific timeout handling
         const locationTimeout = setTimeout(() => {
@@ -180,6 +201,7 @@ function generateSessionId() {
 
 // Update startRecording function
 function startRecording() {
+    debugLog('Starting recording...');
     if (!isRecording && !isPlaybackActive) {
         const now = Date.now();
         if (now - lastRecognitionRestartTime < MINIMUM_RESTART_INTERVAL) {
@@ -192,18 +214,29 @@ function startRecording() {
         isRecognitionRunning = false;
         speechDetected = false;
 
+        // Safari-specific constraints
+        const constraints = {
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                sampleRate: 44100
+            }
+        };
+
         // If we already have microphone permission and an active stream, use it
         if (microphonePermissionGranted && activeStream) {
             initializeRecording(activeStream);
         } else {
-            // Request microphone permission
-            navigator.mediaDevices.getUserMedia({ audio: true })
+            // Request microphone permission with Safari-specific constraints
+            navigator.mediaDevices.getUserMedia(constraints)
                 .then(stream => {
+                    debugLog('Got media stream successfully');
                     microphonePermissionGranted = true;
                     activeStream = stream;
                     initializeRecording(stream);
                 })
                 .catch(error => {
+                    debugLog('Failed to get media stream', error);
                     console.error('Error accessing media devices:', error);
                     statusElement.textContent = "Error accessing the microphone. Please ensure microphone permissions are enabled.";
                     isRecording = false;
@@ -216,40 +249,80 @@ function startRecording() {
 
 // Separate function to initialize recording with a stream
 function initializeRecording(stream) {
+    debugLog('Initializing recording...');
+    
     if (isRecognitionRunning) {
         try {
             recognition.abort();
+            recognition.stop();
         } catch (e) {
-            console.log('Recognition abort error:', e);
+            debugLog('Recognition cleanup error:', e);
         }
         isRecognitionRunning = false;
     }
 
-    recorder = new RecordRTC(stream, {
+    const options = {
         type: 'audio',
         mimeType: getMimeType(),
         recorderType: RecordRTC.StereoAudioRecorder,
+        numberOfAudioChannels: 1,
         timeSlice: 1000,
-        ondataavailable: () => {
+        desiredSampRate: 44100,
+        bufferSize: 16384,
+        sampleRate: 44100,
+        bitsPerSecond: 128000,
+        checkForInactiveTracks: true,
+        disableLogs: false,
+        ondataavailable: (blob) => {
+            debugLog('Data available from recorder');
             resetSilenceDetection();
         }
-    });
+    };
 
-    recorder.startRecording();
-    isRecording = true;
-    statusElement.textContent = "Listening...";
-    updateUIState('listening');
+    try {
+        recorder = new RecordRTC(stream, options);
+        recorder.startRecording();
+        isRecording = true;
+        statusElement.textContent = "Listening...";
+        updateUIState('listening');
 
-    setTimeout(() => {
-        try {
-            recognition.start();
-            isRecognitionRunning = true;
-            startSilenceDetection();
-        } catch (e) {
-            console.log('Recognition start error:', e);
-            resetRecording();
+        // Start speech recognition after a short delay
+        setTimeout(() => {
+            startSpeechRecognition();
+        }, 500);
+    } catch (error) {
+        debugLog('RecordRTC initialization failed:', error);
+        resetRecording();
+    }
+}
+
+// New function to handle speech recognition start
+function startSpeechRecognition() {
+    if (!recognition) {
+        debugLog('Speech recognition not available');
+        return;
+    }
+
+    try {
+        if (isRecognitionRunning) {
+            recognition.stop();
         }
-    }, 100);
+        
+        setTimeout(() => {
+            try {
+                recognition.start();
+                debugLog('Speech recognition started');
+            } catch (error) {
+                debugLog('Speech recognition start failed:', error);
+                isRecognitionRunning = false;
+                // Try to restart after a delay
+                setTimeout(startSpeechRecognition, 1000);
+            }
+        }, 100);
+    } catch (error) {
+        debugLog('Speech recognition error:', error);
+        isRecognitionRunning = false;
+    }
 }
 
 // Silence detection
@@ -279,47 +352,73 @@ function resetSilenceDetection() {
 }
 
 // Update recognition handlers
-recognition.onresult = (event) => {
-    let transcript = '';
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i][0].transcript.trim().length > 0) {
-            transcript += event.results[i][0].transcript;
-            speechDetected = true; // Set flag when actual speech is detected
+if (recognition) {
+    recognition.continuous = true; // Changed to true for continuous listening
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+        debugLog('Recognition started');
+        isRecognitionRunning = true;
+        statusElement.textContent = "Listening...";
+    };
+
+    recognition.onresult = (event) => {
+        debugLog('Recognition result received');
+        speechDetected = true;
+        const transcript = Array.from(event.results)
+            .map(result => result[0].transcript)
+            .join('');
+        
+        if (event.results[0].isFinal) {
+            debugLog('Final transcript:', transcript);
+            statusElement.textContent = "Processing...";
+            stopRecording();
+        } else {
+            statusElement.textContent = transcript;
         }
-    }
-    if (transcript) {
-        statusElement.textContent = `You said: ${transcript}`;
-        resetSilenceDetection();
-    }
-};
+    };
 
-recognition.onend = () => {
-    isRecognitionRunning = false;
-    if (!isPlaybackActive && !isProcessing) {
-        // Reset attempts on successful completion
-        recognitionAttempts = 0;
-        setTimeout(() => {
-            if (!isRecording && !isPlaybackActive && !isProcessing) {
-                startRecording();
+    recognition.onerror = (event) => {
+        debugLog('Recognition error:', event.error);
+        
+        // Don't reset on 'aborted' error as it's common in Safari
+        if (event.error !== 'aborted') {
+            isRecognitionRunning = false;
+            if (event.error === 'not-allowed') {
+                statusElement.textContent = "Please allow microphone access";
             }
-        }, 300);
-    }
-};
+            // Attempt to restart recognition
+            setTimeout(() => {
+                if (isRecording && !isProcessing) {
+                    startSpeechRecognition();
+                }
+            }, 1000);
+        }
+    };
 
-recognition.onerror = (event) => {
-    console.log('Speech recognition error:', event.error);
-    isRecognitionRunning = false;
-
-    if (event.error === 'no-speech' && recognitionAttempts < MAX_RECOGNITION_ATTEMPTS) {
-        recognitionAttempts++;
-        restartRecognition();
-    }
-};
+    recognition.onend = () => {
+        debugLog('Recognition ended');
+        isRecognitionRunning = false;
+        
+        // Only restart if we're still recording and not processing
+        if (isRecording && !isProcessing && !isPlaybackActive) {
+            debugLog('Restarting recognition');
+            setTimeout(() => {
+                startSpeechRecognition();
+            }, 500);
+        }
+    };
+}
 
 // Function to get the appropriate mime type based on the browser
 function getMimeType() {
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    return isSafari ? 'audio/mp4' : 'audio/webm';
+    if (isSafari) {
+        debugLog('Using Safari audio configuration');
+        return 'audio/mp4; codecs=mp4a.40.2';
+    }
+    return 'audio/webm';
 }
 
 // Add these functions to update UI states
@@ -356,23 +455,32 @@ function updateUIState(state) {
 
 // Stop recording and handle the audio blob
 function stopRecording() {
+    debugLog('Stopping recording...');
     if (recorder && isRecording) {
-        if (!speechDetected) {
-            resetRecording();
-            return;
+        try {
+            if (recognition) {
+                recognition.abort();
+                recognition.stop();
+            }
+        } catch (e) {
+            debugLog('Error stopping recognition:', e);
         }
 
-        recorder.stopRecording(() => {
-            const blob = recorder.getBlob();
-            sendAudioToWebhook(blob);
-
-            // Clean up
-            recorder.destroy();
-            recorder = null;
-            isRecording = false;
-            speechDetected = false;
-            recognitionAttempts = 0;
-        });
+        try {
+            recorder.stopRecording(() => {
+                const blob = recorder.getBlob();
+                debugLog('Recording stopped, blob size:', blob.size);
+                if (blob.size > 0) {
+                    sendAudioToWebhook(blob);
+                } else {
+                    debugLog('Empty audio blob detected');
+                    resetRecording();
+                }
+            });
+        } catch (e) {
+            debugLog('Error stopping recorder:', e);
+            resetRecording();
+        }
     }
 }
 
@@ -421,31 +529,47 @@ function sendAudioToWebhook(blob) {
 // Function to play the audio response from the webhook
 function playResponseAudio(audioBlob) {
     const audioUrl = URL.createObjectURL(audioBlob);
-    const audio = new Audio(audioUrl);
-    statusElement.textContent = "Playing Response...";
-    updateUIState('speaking');
-    isPlaybackActive = true;
-    speechDetected = false;
-    recognitionAttempts = 0;
+    const audio = new Audio();
+    
+    audio.addEventListener('canplaythrough', () => {
+        debugLog('Audio can play through');
+        statusElement.textContent = "Playing Response...";
+        updateUIState('speaking');
+        isPlaybackActive = true;
+        
+        audio.play()
+            .then(() => {
+                debugLog('Audio playback started');
+            })
+            .catch(error => {
+                debugLog('Audio playback error:', error);
+                handlePlaybackError();
+            });
+    });
 
-    audio.play()
-        .then(() => {
-            audio.onended = () => {
-                statusElement.textContent = "Ready";
-                updateUIState('listening');
-                isPlaybackActive = false;
-                URL.revokeObjectURL(audioUrl);
-                resetRecording();
-            };
-        })
-        .catch(error => {
-            console.error('Error playing audio:', error);
-            statusElement.textContent = "Error playing audio.";
-            isPlaybackActive = false;
-            updateUIState('listening');
-            URL.revokeObjectURL(audioUrl);
-            resetRecording();
-        });
+    audio.addEventListener('ended', () => {
+        debugLog('Audio playback ended');
+        statusElement.textContent = "Ready";
+        updateUIState('listening');
+        isPlaybackActive = false;
+        URL.revokeObjectURL(audioUrl);
+        resetRecording();
+    });
+
+    audio.addEventListener('error', (e) => {
+        debugLog('Audio loading error:', e);
+        handlePlaybackError();
+    });
+
+    audio.src = audioUrl;
+}
+
+// Add new helper function for playback errors
+function handlePlaybackError() {
+    statusElement.textContent = "Error playing audio";
+    isPlaybackActive = false;
+    updateUIState('listening');
+    resetRecording();
 }
 
 // Update handleMicClick to ensure location is initialized first

@@ -48,16 +48,12 @@ const drBatraClinics = [
 // Geoapify API Key
 const geoapifyKey = "80c4323e959c436eb333cdcfb0ea8aa3";
 
-    // custom
+// custom
 // const audio = document.getElementById('audioPlayer');
 // const playButton = document.getElementById('playButton');
 
 // function replaceAudio(src) {
-//     // Update the audio source
-//     audio.src = src;
-
-//     // Wait for the audio to load
-    
+//     audio.src = src;  
 // }
 
 

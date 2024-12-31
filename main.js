@@ -390,20 +390,18 @@ function sendAudioToWebhook(blob) {
             formData.append('User_address', userAddress);
             formData.append('DrBatra_address', nearestClinic.address);
             formData.append('session_id', sessionId); // Add session ID to the request
-            // https://fonada.app.n8n.cloud/webhook/dbf05039-6da2-4ffe-b3dc-1cfa03d121ec
-            fetch('https://fonada.app.n8n.cloud/webhook-test/2bdfe4c3-d9be-43cc-9f0c-bd14630fc275', {
+            // fetch('https://fonada.app.n8n.cloud/webhook/dbf05039-6da2-4ffe-b3dc-1cfa03d121ec', {
+            fetch('https://fonada.app.n8n.cloud/webhook/2bdfe4c3-d9be-43cc-9f0c-bd14630fc275', {
                 method: 'POST',
                 body: formData
             })
                 .then(response => response.blob())
                 .then(audioBlob => {
                     playResponseAudio(audioBlob);
-                    // replaceAudio(URL.createObjectURL(audioBlob));        
-                    //     // Trigger playback on button click
+                    // replaceAudio(URL.createObjectURL(audioBlob));
                     //     playButton.addEventListener('click', () => {
                     //         audio.play();// Pass your Blob URL here
                     //     });
-
                 })
                 .catch(error => {
                     console.error('Error sending audio:', error);
